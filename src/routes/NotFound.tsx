@@ -8,7 +8,7 @@ export default function NotFound() {
       <Text>It seems that you're lost.</Text>
       <Link to='/'>
         <Button colorScheme='red' variant='link'>
-          Go home &arr;
+          Go home &rarr;
         </Button>
       </Link>
     </VStack>
