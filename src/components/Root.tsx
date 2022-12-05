@@ -1,13 +1,13 @@
+import { Box } from '@chakra-ui/react';
 import { Outlet } from 'react-router-dom';
+import Header from './Header';
 
 export default function Root() {
   return (
-    <div>
-      <h1>
-        Root
-        <Outlet />
-      </h1>
+    <Box>
+      <Header />
+      <Outlet />
       <script src='/socket.io/socket.io.js' />
-    </div>
+    </Box>
   );
 }
