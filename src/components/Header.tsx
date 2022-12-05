@@ -1,7 +1,9 @@
-import { HStack, IconButton, Text } from '@chakra-ui/react';
-import { FaReact, FaMoon } from 'react-icons/fa';
+import { HStack, IconButton, Text, useColorMode, useColorModeValue } from '@chakra-ui/react';
+import { FaReact, FaMoon, FaSun } from 'react-icons/fa';
 
 export default function Header() {
+  const { toggleColorMode } = useColorMode();
+  const Icon = useColorModeValue(FaMoon, FaSun);
   return (
     <HStack px={10} py={5} borderBottomWidth={1} justifyContent={'center'}>
       <HStack w={'container.lg'} justifyContent={'space-between'}>
@@ -12,7 +14,7 @@ export default function Header() {
           </Text>
         </HStack>
         <HStack spacing={2}>
-          <IconButton variant={'ghost'} aria-label={'Toggle dark mode'} icon={<FaMoon />} />
+          <IconButton onClick={toggleColorMode} variant={'ghost'} aria-label={'Toggle dark mode'} icon={<Icon />} />
         </HStack>
       </HStack>
     </HStack>
