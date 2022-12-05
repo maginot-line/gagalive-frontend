@@ -5,7 +5,7 @@ export default function Header() {
   const { toggleColorMode } = useColorMode();
   const Icon = useColorModeValue(FaMoon, FaSun);
   return (
-    <HStack px={10} py={5} borderBottomWidth={1} justifyContent={'center'}>
+    <HStack py={5} borderBottomWidth={1} justifyContent={'center'}>
       <HStack w={'container.lg'} justifyContent={'space-between'}>
         <HStack alignItems={'center'} spacing={5} color={'blue.400'}>
           <FaReact size={48} />
