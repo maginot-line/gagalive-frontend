@@ -1,20 +1,63 @@
 import { Box, Button, Grid, GridItem, HStack, Image, Input, InputGroup, InputRightElement } from '@chakra-ui/react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import io from 'socket.io-client';
+
+interface IForm {
+  message: string;
+}
+
+let roomId: string;
+let socketId: string;
 
 export default function Home() {
   const socket = io('http://127.0.0.1:8000');
   const [isEnterRoom, setIsEnterRoom] = useState(false);
-  const roomRef = useRef<HTMLInputElement>(null);
-  const enterRoom = () => {
-    socket.emit('enter_room', () => {});
+  const { register, handleSubmit, reset } = useForm<IForm>();
+  const addMessage = (message: string, justifyContent: string) => {
+    const roomBoxElement = document.getElementById('roomBoxElement') as HTMLElement;
+    const messageDiv = document.createElement('div');
+    messageDiv.style.display = 'flex';
+    messageDiv.style.justifyContent = justifyContent;
+    messageDiv.style.marginTop = '0.5rem';
+    const messageP = document.createElement('span');
+    messageP.style.borderRadius = '0.375rem';
+    messageP.style.borderWidth = '1px';
+    messageP.style.borderColor = 'gray.200';
+    messageP.style.padding = '0.5rem';
+    messageP.innerText = message;
+    messageDiv.appendChild(messageP);
+    roomBoxElement.appendChild(messageDiv);
+  };
+  socket.on('connect', () => {
+    socketId = socket.id;
+  });
+  const joinRoom = () => {
+    socket.emit('join_room', () => {});
     setIsEnterRoom(true);
   };
-  socket.on('welcome', () => {
-    console.log('welcome');
-    const text = document.createElement('p');
-    text.innerText = 'welcome';
-    roomRef.current?.appendChild(text);
+  const leaveRoom = () => {
+    socket.emit('leave_room', roomId, () => {});
+    setIsEnterRoom(false);
+  };
+  const onSubmit = (data: IForm) => {
+    socket.emit('send_message', roomId, socketId, data.message, () => {});
+    reset();
+  };
+  socket.on('welcome', (data) => {
+    roomId = data;
+    addMessage('Welcome!', 'start');
+  });
+  socket.on('receive_message', (receiveId: string, message: string) => {
+    if (socketId === receiveId) {
+      addMessage(message, 'end');
+      return;
+    } else {
+      addMessage(message, 'start');
+    }
+  });
+  socket.on('break_room', () => {
+    leaveRoom();
   });
   return (
     <HStack justifyContent='center'>
@@ -33,21 +76,27 @@ export default function Home() {
           </Grid>
         </GridItem>
         <GridItem rowSpan={2} colSpan={2}>
-          <Box ref={roomRef} h='722' borderWidth={1} borderRadius='lg' py='2' px='4' />
-          <InputGroup mt={4} size='md'>
-            <Input pr='4.5rem' variant='filled' placeholder='Enter your message' />
-            <InputRightElement w='4.5rem'>
-              {!isEnterRoom ? (
-                <Button onClick={enterRoom} h='1.75rem' size='sm' variant='solid'>
-                  Join
-                </Button>
-              ) : (
-                <Button h='1.75rem' size='sm' variant='solid'>
+          <Box id='roomBoxElement' position='relative' h='722' borderWidth={1} borderRadius='lg' paddingTop={'12'} paddingBottom={4} px='4'>
+            {isEnterRoom ? (
+              <Button onClick={leaveRoom} position='absolute' top={0} right={0}>
+                Leave Room
+              </Button>
+            ) : (
+              <Button onClick={joinRoom} position='absolute' top={0} right={0}>
+                Enter Room
+              </Button>
+            )}
+          </Box>
+          <Box as='form' onSubmit={handleSubmit(onSubmit)}>
+            <InputGroup mt={4} size='md'>
+              <Input {...register('message')} pr='4.5rem' variant='filled' placeholder='Enter your message' />
+              <InputRightElement w='4.5rem'>
+                <Button type='submit' h='1.75rem' size='sm' variant='solid'>
                   Send
                 </Button>
-              )}
-            </InputRightElement>
-          </InputGroup>
+              </InputRightElement>
+            </InputGroup>
+          </Box>
         </GridItem>
       </Grid>
     </HStack>
