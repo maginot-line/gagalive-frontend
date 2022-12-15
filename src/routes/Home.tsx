@@ -8,16 +8,19 @@ interface IForm {
   message: string;
 }
 
-let roomId: string;
 const getTime = new Date().getTime().toString(36);
 const randomString = Math.random().toString(36).substring(2, 11);
 const token = getTime + randomString;
-const socket = io('http://127.0.0.1:8000', { transports: ['websocket', 'polling'], auth: { token } });
 
 export default function Home() {
+  const socket = io('http://127.0.0.1:8000', { transports: ['websocket'], auth: { token } });
+  const [width, setWidth] = useState(window.innerWidth);
+  window.addEventListener('resize', () => {
+    setWidth(window.innerWidth);
+  });
   const { register, handleSubmit, reset } = useForm<IForm>();
   const [concurrentUsers, setConcurrentUsers] = useState(0);
-  const [isEnterRoom, setIsEnterRoom] = useState(false);
+  const [isJoinRoom, setIsJoinRoom] = useState(false);
   const addMessage = (message: string, justifyContent: string) => {
     const chatElement = document.getElementById('chatElement') as HTMLElement;
     const messageDiv = document.createElement('div');
@@ -34,6 +37,11 @@ export default function Home() {
     messageDiv.appendChild(messageP);
     chatElement.appendChild(messageDiv);
   };
+  const onKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSubmit(onSubmit)();
+    }
+  };
   const timer = (i: string) => {
     let time = 60;
     const timerElement = document.getElementById(`timer${i}`) as HTMLElement;
@@ -45,17 +53,13 @@ export default function Home() {
       }
     }, 1000);
   };
-  const [width, setWidth] = useState(window.innerWidth);
-  window.addEventListener('resize', () => {
-    setWidth(window.innerWidth);
-  });
   socket.on('connect', () => {});
   socket.on('concurrent_users', (users: number) => {
     setConcurrentUsers(users);
   });
   const joinRoom = () => {
     socket.emit('join_room', () => {});
-    setIsEnterRoom(true);
+    setIsJoinRoom(true);
   };
   socket.on('welcome', (type: string) => {
     if (type === 'join') {
@@ -67,7 +71,8 @@ export default function Home() {
     const chatElement = document.getElementById('chatElement') as HTMLElement;
     const messageDiv = chatElement.querySelectorAll('div');
     messageDiv.forEach((e) => e.remove());
-    setIsEnterRoom(false);
+    reset();
+    setIsJoinRoom(false);
   };
   socket.on('break_room', (receiveToken: string) => {
     if (token !== receiveToken) {
@@ -78,7 +83,7 @@ export default function Home() {
     if (data.message === '') {
       return;
     }
-    socket.emit('send_message', roomId, data.message, () => {});
+    socket.emit('send_message', data.message, () => {});
     reset();
   };
   socket.on('receive_message', (receiveToken: string, message: string) => {
@@ -129,7 +134,7 @@ export default function Home() {
           <Box id='buttonElement' mt={2}>
             <HStack spacing='4' justifyContent='end'>
               <Text>{concurrentUsers} connected</Text>
-              {isEnterRoom ? (
+              {isJoinRoom ? (
                 <Button onClick={leaveRoom} size='sm'>
                   Leave Room
                 </Button>
@@ -141,7 +146,15 @@ export default function Home() {
             </HStack>
             <Box as='form' onSubmit={handleSubmit(onSubmit)}>
               <InputGroup mt={2} size='md'>
-                <Input {...register('message')} pr='4.5rem' variant='filled' placeholder='Enter your message' />
+                {!isJoinRoom ? (
+                  <>
+                    <Input {...register('message')} pr='4.5rem' variant='filled' placeholder='Enter your message' isDisabled />
+                  </>
+                ) : (
+                  <>
+                    <Input {...register('message')} pr='4.5rem' variant='filled' placeholder='Enter your message' />
+                  </>
+                )}
                 <InputRightElement w='4.5rem'>
                   <Button type='submit' h='1.75rem' size='sm' variant='solid'>
                     Send
