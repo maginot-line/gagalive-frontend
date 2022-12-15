@@ -9,12 +9,15 @@ interface IForm {
 }
 
 let roomId: string;
-let socketId: string;
+const getTime = new Date().getTime().toString(36);
+const randomString = Math.random().toString(36).substring(2, 11);
+const token = getTime + randomString;
+const socket = io('http://127.0.0.1:8000', { transports: ['websocket', 'polling'], auth: { token } });
 
 export default function Home() {
-  const socket = io('http://127.0.0.1:8000', { transports: ['websocket'] });
-  const [isEnterRoom, setIsEnterRoom] = useState(false);
   const { register, handleSubmit, reset } = useForm<IForm>();
+  const [concurrentUsers, setConcurrentUsers] = useState(0);
+  const [isEnterRoom, setIsEnterRoom] = useState(false);
   const addMessage = (message: string, justifyContent: string) => {
     const chatElement = document.getElementById('chatElement') as HTMLElement;
     const messageDiv = document.createElement('div');
@@ -31,51 +34,6 @@ export default function Home() {
     messageDiv.appendChild(messageP);
     chatElement.appendChild(messageDiv);
   };
-  socket.on('connect', () => {
-    socketId = socket.id;
-  });
-  const [concurrentUsers, setConcurrentUsers] = useState(0);
-  socket.on('concurrent_users', (users: number) => {
-    setConcurrentUsers(users);
-  });
-  const joinRoom = () => {
-    socket.emit('join_room', () => {});
-    setIsEnterRoom(true);
-  };
-  const leaveRoom = () => {
-    socket.emit('leave_room', roomId, socketId, () => {});
-    const chatElement = document.getElementById('chatElement') as HTMLElement;
-    const messageDiv = chatElement.querySelectorAll('div');
-    messageDiv.forEach((e) => e.remove());
-    setIsEnterRoom(false);
-  };
-  const onSubmit = (data: IForm) => {
-    if (data.message === '') {
-      return;
-    }
-    socket.emit('send_message', roomId, socketId, data.message, () => {});
-    reset();
-  };
-  socket.on('welcome', (type: string, receiveRoomId: string) => {
-    roomId = receiveRoomId;
-    if (type === 'join') {
-      addMessage('Welcome!', 'start');
-    }
-  });
-  socket.on('receive_message', (receiveSocketId: string, message: string) => {
-    if (socketId === receiveSocketId) {
-      addMessage(message, 'end');
-    } else {
-      addMessage(message, 'start');
-    }
-    const chatElement = document.getElementById('chatElement') as HTMLElement;
-    chatElement.scrollTop = chatElement.scrollHeight;
-  });
-  socket.on('break_room', (receiveSocketId) => {
-    if (socketId !== receiveSocketId) {
-      leaveRoom();
-    }
-  });
   const timer = (i: string) => {
     let time = 60;
     const timerElement = document.getElementById(`timer${i}`) as HTMLElement;
@@ -91,10 +49,69 @@ export default function Home() {
   window.addEventListener('resize', () => {
     setWidth(window.innerWidth);
   });
+  socket.on('connect', () => {});
+  socket.on('concurrent_users', (users: number) => {
+    setConcurrentUsers(users);
+  });
+  const joinRoom = () => {
+    socket.emit('join_room', () => {});
+    setIsEnterRoom(true);
+  };
+  socket.on('welcome', (type: string) => {
+    if (type === 'join') {
+      addMessage('Welcome!', 'start');
+    }
+  });
+  const leaveRoom = () => {
+    socket.emit('leave_room', () => {});
+    const chatElement = document.getElementById('chatElement') as HTMLElement;
+    const messageDiv = chatElement.querySelectorAll('div');
+    messageDiv.forEach((e) => e.remove());
+    setIsEnterRoom(false);
+  };
+  socket.on('break_room', (receiveToken: string) => {
+    if (token !== receiveToken) {
+      leaveRoom();
+    }
+  });
+  const onSubmit = (data: IForm) => {
+    if (data.message === '') {
+      return;
+    }
+    socket.emit('send_message', roomId, data.message, () => {});
+    reset();
+  };
+  socket.on('receive_message', (receiveToken: string, message: string) => {
+    if (token !== receiveToken) {
+      addMessage(message, 'start');
+    } else {
+      addMessage(message, 'end');
+    }
+    const chatElement = document.getElementById('chatElement') as HTMLElement;
+    chatElement.scrollTop = chatElement.scrollHeight;
+  });
   return (
     <HStack justifyContent='center'>
-      <Grid w='container.xl' mt={10} gap={2} templateRows='repeat(3, 1fr)' templateColumns={width > 640 ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)'}>
-        <GridItem display='flex' flexDirection='column' rowSpan={3} colSpan={2}>
+      <Grid w='container.lg' mt={10} gap={2} templateColumns={'repeat(2, 1fr)'} templateRows='repeat(1, 1fr)'>
+        <GridItem colSpan={1} rowSpan={1}>
+          <Grid gap={2} templateColumns={width > 640 ? 'repeat(2, 1fr)' : 'repeat(1, 1fr)'} templateRows='repeat(1, 1fr)'>
+            {(width > 640 ? [0, 1, 2, 3, 4, 5] : [0, 1, 2]).map((_, i) => (
+              <GridItem position='relative' colSpan={1} rowSpan={1} key={i}>
+                <Image
+                  borderRadius={'lg'}
+                  src='https://a0.muscache.com/im/pictures/miso/Hosting-47181423/original/39c9d4e7-78d0-4807-9f0d-3029d987d02a.jpeg?im_w=720'
+                />
+                <Button onClick={() => timer(i.toString())} variant='unstyled' position='absolute' top={0} right={1} color='white'>
+                  <HStack justifyContent='start' spacing={1}>
+                    <GiIceBomb size='20px' />
+                    <p id={'timer' + i}>60</p>
+                  </HStack>
+                </Button>
+              </GridItem>
+            ))}
+          </Grid>
+        </GridItem>
+        <GridItem display='flex' flexDirection='column' colSpan={1} rowSpan={1}>
           <Box
             id='chatElement'
             overflowY='auto'
@@ -134,20 +151,6 @@ export default function Home() {
             </Box>
           </Box>
         </GridItem>
-        {(width > 640 ? [0, 1, 2, 3, 4, 5] : [0, 1, 2]).map((_, i) => (
-          <GridItem position='relative' rowSpan={1} colSpan={1} key={i}>
-            <Image
-              borderRadius={'lg'}
-              src='https://a0.muscache.com/im/pictures/miso/Hosting-47181423/original/39c9d4e7-78d0-4807-9f0d-3029d987d02a.jpeg?im_w=720'
-            />
-            <Button onClick={() => timer(i.toString())} variant='unstyled' position='absolute' top={0} right={1} color='white'>
-              <HStack justifyContent='start' spacing={1}>
-                <GiIceBomb size='20px' />
-                <p id={'timer' + i}>60</p>
-              </HStack>
-            </Button>
-          </GridItem>
-        ))}
       </Grid>
     </HStack>
   );
