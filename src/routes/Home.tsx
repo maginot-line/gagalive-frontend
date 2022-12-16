@@ -1,5 +1,5 @@
 import { Box, Button, Grid, GridItem, HStack, Image, Input, InputGroup, InputRightElement, Text } from '@chakra-ui/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { GiIceBomb } from 'react-icons/gi';
 import io from 'socket.io-client';
@@ -8,12 +8,9 @@ interface IForm {
   message: string;
 }
 
-const getTime = new Date().getTime().toString(36);
-const randomString = Math.random().toString(36).substring(2, 11);
-const token = getTime + randomString;
+const socket = io('http://localhost:8000', { transports: ['websocket'] });
 
 export default function Home() {
-  const socket = io('http://127.0.0.1:8000', { transports: ['websocket'], auth: { token } });
   const [width, setWidth] = useState(window.innerWidth);
   window.addEventListener('resize', () => {
     setWidth(window.innerWidth);
@@ -53,19 +50,10 @@ export default function Home() {
       }
     }, 1000);
   };
-  socket.on('connect', () => {});
-  socket.on('concurrent_users', (users: number) => {
-    setConcurrentUsers(users);
-  });
   const joinRoom = () => {
     socket.emit('join_room', () => {});
     setIsJoinRoom(true);
   };
-  socket.on('welcome', (type: string) => {
-    if (type === 'join') {
-      addMessage('Welcome!', 'start');
-    }
-  });
   const leaveRoom = () => {
     socket.emit('leave_room', () => {});
     const chatElement = document.getElementById('chatElement') as HTMLElement;
@@ -74,27 +62,32 @@ export default function Home() {
     reset();
     setIsJoinRoom(false);
   };
-  socket.on('break_room', (receiveToken: string) => {
-    if (token !== receiveToken) {
-      leaveRoom();
-    }
-  });
   const onSubmit = (data: IForm) => {
     if (data.message === '') {
       return;
     }
     socket.emit('send_message', data.message, () => {});
+    addMessage(data.message, 'end');
     reset();
   };
-  socket.on('receive_message', (receiveToken: string, message: string) => {
-    if (token !== receiveToken) {
+  useEffect(() => {
+    socket.on('welcome', (type: string) => {
+      if (type === 'join') {
+        addMessage('Welcome!', 'start');
+      }
+    });
+    socket.on('concurrent_users', (users: number) => {
+      setConcurrentUsers(users);
+    });
+    socket.on('break_room', (receiveToken: string) => {
+      leaveRoom();
+    });
+    socket.on('receive_message', (message: string) => {
       addMessage(message, 'start');
-    } else {
-      addMessage(message, 'end');
-    }
-    const chatElement = document.getElementById('chatElement') as HTMLElement;
-    chatElement.scrollTop = chatElement.scrollHeight;
-  });
+      const chatElement = document.getElementById('chatElement') as HTMLElement;
+      chatElement.scrollTop = chatElement.scrollHeight;
+    });
+  }, []);
   return (
     <HStack justifyContent='center'>
       <Grid w='container.lg' mt={10} gap={2} templateColumns={'repeat(2, 1fr)'} templateRows='repeat(1, 1fr)'>
