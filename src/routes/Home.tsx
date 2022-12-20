@@ -1,4 +1,4 @@
-import { Box, Button, Grid, GridItem, HStack, Image, Input, InputGroup, InputRightElement, Text } from '@chakra-ui/react';
+import { Box, Button, Grid, GridItem, Heading, HStack, Image, Input, InputGroup, InputRightElement, Text, VStack } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { GiIceBomb } from 'react-icons/gi';
@@ -8,13 +8,46 @@ interface IForm {
   message: string;
 }
 
+interface IImageForm {
+  photo: FileList;
+}
+
 const socket = io('http://localhost:8000', { transports: ['websocket'] });
 
 export default function Home() {
+  // Image
   const [width, setWidth] = useState(window.innerWidth);
   window.addEventListener('resize', () => {
     setWidth(window.innerWidth);
   });
+  const { register: imgRegister, handleSubmit: imgHandleSubmit, reset: imgReset, watch: imgWatch } = useForm<IImageForm>();
+  const timer = (i: string) => {
+    let time = 60;
+    const timerElement = document.getElementById(`timer${i}`) as HTMLElement;
+    const timer = setInterval(() => {
+      time--;
+      timerElement.innerText = time.toString();
+      if (time === 0) {
+        clearInterval(timer);
+      }
+    }, 1000);
+  };
+  const onImageSubmit = (data: IImageForm) => {
+    console.log(data);
+  };
+  const photo = imgWatch('photo');
+  const [photoPreview, setPhotoPreview] = useState('');
+  useEffect(() => {
+    if (photo && photo.length > 0) {
+      const file = photo[0];
+      setPhotoPreview(URL.createObjectURL(file));
+    }
+  }, [photo]);
+  const cancelImage = () => {
+    imgReset();
+    setPhotoPreview('');
+  };
+  // Chat
   const { register, handleSubmit, reset } = useForm<IForm>();
   const [concurrentUsers, setConcurrentUsers] = useState(0);
   const [isJoinRoom, setIsJoinRoom] = useState(false);
@@ -33,22 +66,6 @@ export default function Home() {
     messageP.innerText = message;
     messageDiv.appendChild(messageP);
     chatElement.appendChild(messageDiv);
-  };
-  const onKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSubmit(onSubmit)();
-    }
-  };
-  const timer = (i: string) => {
-    let time = 60;
-    const timerElement = document.getElementById(`timer${i}`) as HTMLElement;
-    const timer = setInterval(() => {
-      time--;
-      timerElement.innerText = time.toString();
-      if (time === 0) {
-        clearInterval(timer);
-      }
-    }, 1000);
   };
   const joinRoom = () => {
     socket.emit('join_room', () => {});
@@ -69,6 +86,11 @@ export default function Home() {
     socket.emit('send_message', data.message, () => {});
     addMessage(data.message, 'end');
     reset();
+  };
+  const onKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSubmit(onSubmit)();
+    }
   };
   useEffect(() => {
     socket.on('welcome', (type: string) => {
@@ -93,18 +115,66 @@ export default function Home() {
       <Grid w='container.lg' mt={10} gap={2} templateColumns={'repeat(2, 1fr)'} templateRows='repeat(1, 1fr)'>
         <GridItem colSpan={1} rowSpan={1}>
           <Grid gap={2} templateColumns={width > 640 ? 'repeat(2, 1fr)' : 'repeat(1, 1fr)'} templateRows='repeat(1, 1fr)'>
-            {(width > 640 ? [0, 1, 2, 3, 4, 5] : [0, 1, 2]).map((_, i) => (
-              <GridItem position='relative' colSpan={1} rowSpan={1} key={i}>
-                <Image
-                  borderRadius={'lg'}
-                  src='https://a0.muscache.com/im/pictures/miso/Hosting-47181423/original/39c9d4e7-78d0-4807-9f0d-3029d987d02a.jpeg?im_w=720'
-                />
-                <Button onClick={() => timer(i.toString())} variant='unstyled' position='absolute' top={0} right={1} color='white'>
-                  <HStack justifyContent='start' spacing={1}>
-                    <GiIceBomb size='20px' />
-                    <p id={'timer' + i}>60</p>
-                  </HStack>
-                </Button>
+            <GridItem display='flex' flexDirection='column' colSpan={1} rowSpan={1} position='relative'>
+              {photoPreview ? (
+                <>
+                  <Box position='relative' height='100%' width='100%'>
+                    <HStack position='absolute' top='0' left='0' height='100%' width='100%'>
+                      <HStack alignItems='center' justify='center' height='100%' width='100%'>
+                        <Button colorScheme='cyan' onSubmit={imgHandleSubmit(onImageSubmit)}>
+                          Send
+                        </Button>
+                        <Button colorScheme='red' onClick={cancelImage}>
+                          Cancel
+                        </Button>
+                      </HStack>
+                    </HStack>
+                    <Image src={photoPreview} borderRadius='lg' height='100%' width='100%' objectFit='cover' />
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Box position='relative' height='100%' width='100%' borderWidth={3} borderRadius='lg' borderStyle='dashed' as='form'>
+                    <HStack position='absolute' top='0' left='0' height='100%' width='100%'>
+                      <HStack height='100%' width='100%' alignItems='center' justify='center' spacing='4'>
+                        <VStack p='8' textAlign='center' spacing='1'>
+                          <Heading fontSize='lg' fontWeight='bold'>
+                            Drop images here
+                          </Heading>
+                          <Text fontWeight='light'>or click to upload</Text>
+                        </VStack>
+                      </HStack>
+                    </HStack>
+                    <Input
+                      {...imgRegister('photo')}
+                      type='file'
+                      height='100%'
+                      width='100%'
+                      position='absolute'
+                      top='0'
+                      left='0'
+                      opacity='0'
+                      aria-hidden='true'
+                      accept='image/*'
+                    />
+                  </Box>
+                </>
+              )}
+            </GridItem>
+            {(width > 640 ? [0, 1, 2, 3, 4] : [0, 1]).map((_, i) => (
+              <GridItem colSpan={1} rowSpan={1} key={i}>
+                <Box position='relative'>
+                  <Image
+                    borderRadius='lg'
+                    src='https://a0.muscache.com/im/pictures/miso/Hosting-47181423/original/39c9d4e7-78d0-4807-9f0d-3029d987d02a.jpeg?im_w=720'
+                  />
+                  <Button onClick={() => timer(i.toString())} variant='unstyled' position='absolute' top={0} right={1} color='white'>
+                    <HStack justifyContent='start' spacing={1}>
+                      <GiIceBomb size='20px' />
+                      <p id={'timer' + i}>60</p>
+                    </HStack>
+                  </Button>
+                </Box>
               </GridItem>
             ))}
           </Grid>
@@ -123,7 +193,7 @@ export default function Home() {
                 display: 'none',
               },
             }}
-          ></Box>
+          />
           <Box id='buttonElement' mt={2}>
             <HStack spacing='4' justifyContent='end'>
               <Text>{concurrentUsers} connected</Text>
